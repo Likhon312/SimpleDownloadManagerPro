@@ -1,4 +1,5 @@
 import os
+import shutil
 import re
 import json
 import math
@@ -263,30 +264,19 @@ class App:
         if job.status == "Complete":
             return
         job.stop.clear()
+        job.status = "Starting..."
+        job.error = ""
         job.thread = threading.Thread(target=job.run, daemon=True)
         job.thread.start()
 
     def start_queue(self):
-        # Queue starts jobs one by one to avoid overloading the connection.
-        def next_job(index=0):
-            while index < len(self.jobs) and self.jobs[index].status == "Complete":
-                index += 1
-            if index >= len(self.jobs):
-                return
-            job = self.jobs[index]
-            if job.thread and job.thread.is_alive():
-                self.root.after(500, lambda: next_job(index))
-                return
-            if job.status in ("Queued", "Paused", "Error"):
-                self.launch(job)
-            self.root.after(500, lambda: wait_job(index))
-        def wait_job(index):
-            job = self.jobs[index]
-            if job.thread and job.thread.is_alive():
-                self.root.after(500, lambda: wait_job(index))
-            else:
-                next_job(index + 1)
-        next_job()
+        # Start all pending jobs and show startup state immediately.
+        pending = [j for j in self.jobs if j.status in ("Queued", "Paused", "Error")]
+        if not pending:
+            messagebox.showinfo("Download queue", "There are no queued downloads to start.")
+            return
+        for job in pending:
+            self.launch(job)
 
     def resume_selected(self):
         j = self.selected()
