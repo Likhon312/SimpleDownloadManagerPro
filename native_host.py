@@ -9,6 +9,8 @@ def read_message():
     if len(raw) != 4:
         return None
     size = struct.unpack("=I", raw)[0]
+    if size > 8 * 1024 * 1024:
+        return None
     data = sys.stdin.buffer.read(size)
     if len(data) != size:
         return None
@@ -28,13 +30,23 @@ def main():
     if not isinstance(url, str) or not url.startswith(("http://", "https://")):
         send_message({"ok": False, "error": "Only HTTP/HTTPS URLs are supported"})
         return
+    cookie = msg.get("cookie", "")
+    filename = msg.get("filename", "")
+    if not isinstance(cookie, str) or len(cookie) > 1024 * 1024:
+        send_message({"ok": False, "error": "Invalid cookie data"})
+        return
+    if not isinstance(filename, str):
+        filename = ""
     folder = os.path.dirname(os.path.abspath(sys.argv[0]))
     app = os.path.join(folder, "SimpleDownloadManagerPro.exe")
     if not os.path.isfile(app):
         send_message({"ok": False, "error": "Download manager EXE not found beside native host"})
         return
     try:
-        subprocess.Popen([app, "--add-url", url], cwd=folder, close_fds=True)
+        subprocess.Popen(
+            [app, "--add-url", url, "--cookie", cookie, "--filename", filename],
+            cwd=folder, close_fds=True
+        )
         send_message({"ok": True})
     except Exception as exc:
         send_message({"ok": False, "error": str(exc)})
