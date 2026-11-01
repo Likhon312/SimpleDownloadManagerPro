@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows EXE and Firefox Connector
 
 on:
   workflow_dispatch:
@@ -15,8 +15,23 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --upgrade pyinstaller
       - run: python -m PyInstaller --clean --onefile --windowed --name SimpleDownloadManagerPro download_manager.py
+      - run: python -m PyInstaller --clean --onefile --name smdm_native_host native_host.py
+      - name: Prepare Firefox connector package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\firefox-extension | Out-Null
+          Copy-Item firefox-extension\* dist\firefox-extension\ -Recurse -Force
+          Copy-Item INSTALL_FIREFOX.bat dist\
+          Copy-Item README.txt dist\
+          Compress-Archive -Path firefox-extension\* -DestinationPath dist\Firefox-Extension.zip -Force
       - uses: actions/upload-artifact@v4
         with:
-          name: SimpleDownloadManagerPro-Windows
-          path: dist/SimpleDownloadManagerPro.exe
+          name: SimpleDownloadManagerPro-Windows-Firefox
+          path: |
+            dist/SimpleDownloadManagerPro.exe
+            dist/smdm_native_host.exe
+            dist/INSTALL_FIREFOX.bat
+            dist/Firefox-Extension.zip
+            dist/firefox-extension/**
+            dist/README.txt
           if-no-files-found: error
