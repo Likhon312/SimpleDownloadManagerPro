@@ -1,15 +1,15 @@
 {
   "manifest_version": 2,
   "name": "Simple Download Manager Pro Connector",
-  "version": "1.0.0",
-  "description": "Send Firefox downloads to Simple Download Manager Pro.",
+  "version": "1.1.0",
+  "description": "Send Firefox downloads and URL-scoped session cookies to Simple Download Manager Pro.",
   "browser_specific_settings": {
     "gecko": {
       "id": "smdm-firefox-connector@example.com",
       "strict_min_version": "91.0"
     }
   },
-  "permissions": ["downloads", "nativeMessaging", "storage"],
+  "permissions": ["downloads", "nativeMessaging", "storage", "cookies", "<all_urls>"],
   "background": { "scripts": ["background.js"] },
   "browser_action": {
     "default_title": "Simple Download Manager Pro",
