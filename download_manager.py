@@ -30,10 +30,16 @@ def format_size(n):
         value /= 1024
 
 class Job:
-    def __init__(self, url, folder):
+    def __init__(self, url, folder, cookie="", filename=""):
         self.url = url
         self.folder = folder
-        self.filename = safe_filename(url)
+        self.headers = {"User-Agent": USER_AGENT}
+        if cookie:
+            self.headers["Cookie"] = cookie
+        requested_name = os.path.basename(filename.replace(chr(92), "/")) if filename else ""
+        forbidden = '<>:/\\|?*' + chr(34)
+        self.filename = ''.join('_' if c in forbidden or ord(c) < 32 else c for c in requested_name).strip(' .') if requested_name else safe_filename(url)
+        self.filename = self.filename or safe_filename(url)
         self.path = os.path.join(folder, self.filename)
         self.temp_dir = self.path + ".smdm_parts"
         self.stop = threading.Event()
@@ -47,8 +53,7 @@ class Job:
         self.supports_ranges = False
 
     def get_size_and_ranges(self):
-        req = urllib.request.Request(self.url, method="HEAD",
-            headers={"User-Agent": USER_AGENT})
+        req = urllib.request.Request(self.url, method="HEAD", headers=dict(self.headers))
         try:
             with urllib.request.urlopen(req, timeout=20) as r:
                 length = r.headers.get("Content-Length")
@@ -60,8 +65,7 @@ class Job:
         if self.total and not self.supports_ranges:
             # Probe a one-byte range; some servers omit Accept-Ranges on HEAD.
             try:
-                req = urllib.request.Request(self.url, headers={
-                    "User-Agent": USER_AGENT, "Range": "bytes=0-0"})
+                req = urllib.request.Request(self.url, headers={**self.headers, "Range": "bytes=0-0"})
                 with urllib.request.urlopen(req, timeout=20) as r:
                     self.supports_ranges = getattr(r, "status", 200) == 206
                     if self.total is None:
@@ -90,7 +94,7 @@ class Job:
 
     def run_single(self):
         existing = os.path.getsize(self.path) if os.path.exists(self.path) else 0
-        headers = {"User-Agent": USER_AGENT}
+        headers = dict(self.headers)
         if existing:
             headers["Range"] = f"bytes={existing}-"
         req = urllib.request.Request(self.url, headers=headers)
@@ -140,7 +144,7 @@ class Job:
             path, start, end, have = part
             if self.stop.is_set() or have >= end - start + 1:
                 return
-            headers = {"User-Agent": USER_AGENT, "Range": f"bytes={start + have}-{end}"}
+            headers = {**self.headers, "Range": f"bytes={start + have}-{end}"}
             req = urllib.request.Request(self.url, headers=headers)
             try:
                 with urllib.request.urlopen(req, timeout=30) as response:
@@ -185,8 +189,10 @@ class Job:
         self.downloaded = self.total
 
 class App:
-    def __init__(self, root):
+    def __init__(self, root, initial_url=None, cookie="", filename=""):
         self.root = root
+        self.initial_cookie = cookie
+        self.initial_filename = filename
         self.root.title(APP_NAME)
         self.root.geometry("980x600")
         self.root.minsize(760, 470)
@@ -250,7 +256,9 @@ class App:
         if p.scheme not in ("http", "https") or not p.netloc:
             messagebox.showwarning("Invalid URL", "Please enter a valid HTTP or HTTPS direct-download URL.")
             return
-        job = Job(url, self.folder.get())
+        job = Job(url, self.folder.get(), self.initial_cookie, self.initial_filename)
+        self.initial_cookie = ""
+        self.initial_filename = ""
         if any(j.path == job.path and j.status != "Complete" for j in self.jobs):
             messagebox.showwarning("Already queued", "This filename is already in the queue.")
             return
@@ -324,12 +332,20 @@ class App:
 if __name__ == "__main__":
     import sys
     initial_url = None
-    if len(sys.argv) >= 3 and sys.argv[1] == "--add-url":
-        initial_url = sys.argv[2]
+    cookie = ""
+    filename = ""
+    args = sys.argv[1:]
+    for i, arg in enumerate(args[:-1]):
+        if arg == "--add-url":
+            initial_url = args[i + 1]
+        elif arg == "--cookie":
+            cookie = args[i + 1]
+        elif arg == "--filename":
+            filename = args[i + 1]
     root = tk.Tk()
     try:
         ttk.Style().theme_use("vista")
     except tk.TclError:
         pass
-    App(root, initial_url=initial_url)
+    App(root, initial_url=initial_url, cookie=cookie, filename=filename)
     root.mainloop()
