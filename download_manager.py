@@ -192,6 +192,11 @@ class App:
         self.root.minsize(760, 470)
         self.jobs = []
         self.build()
+        if initial_url:
+            self.url.set(initial_url)
+            self.add_job()
+            if self.jobs:
+                self.launch(self.jobs[-1])
         self.root.after(300, self.refresh)
 
     def build(self):
@@ -317,10 +322,14 @@ class App:
         self.root.after(400, self.refresh)
 
 if __name__ == "__main__":
+    import sys
+    initial_url = None
+    if len(sys.argv) >= 3 and sys.argv[1] == "--add-url":
+        initial_url = sys.argv[2]
     root = tk.Tk()
     try:
         ttk.Style().theme_use("vista")
     except tk.TclError:
         pass
-    App(root)
+    App(root, initial_url=initial_url)
     root.mainloop()
